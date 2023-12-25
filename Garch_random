@@ -1,0 +1,39 @@
+import numpy as np
+import pandas as pd
+from arch import arch_model
+import matplotlib.pyplot as plt
+from statsmodels.tsa.stattools import adfuller
+
+np.random.seed(0)
+returns = np.random.normal(loc=0.001, scale=0.01, size=1000)
+
+
+date_range = pd.date_range(start='2023-01-01', periods=len(returns), freq='B')
+data = pd.DataFrame(data={'Returns': returns}, index=date_range)
+print(returns)
+
+adf_test = adfuller(data['Returns'])
+
+print('ADF Statistic: %f' % adf_test[0])
+print('p-value: %f' % adf_test[1])
+print('Critical Values:')
+for key, value in adf_test[4].items():
+    print('\t%s: %.3f' % (key, value))
+
+# Интерпретация результатов
+if adf_test[1] < 0.05:
+    print("Ряд стационарен.")
+else:
+    print("Ряд нестационарен.")
+data.dropna(inplace=True)
+p = 1
+q = 1
+model = arch_model(data['Returns'], vol='Garch', p=p, q=q, mean='constant', dist='normal')
+results = model.fit()
+print(results.summary())
+forecast = results.forecast(horizon=5)
+historical_volatilities = np.sqrt(results.conditional_volatility)
+print(historical_volatilities)
+print("Forecasted volatilities for the next week:")
+for i in range(5):
+    print(f"Day {i+1}: {forecast.variance.iloc[-1][i]}")
