@@ -4,36 +4,73 @@ from arch import arch_model
 import matplotlib.pyplot as plt
 from statsmodels.tsa.stattools import adfuller
 
+# Устанавливаем начальное значение для генерации случайных чисел
 np.random.seed(0)
+# Генерация случайных возвратов
 returns = np.random.normal(loc=0.001, scale=0.01, size=1000)
 
-
+# Создание временного ряда для данных
 date_range = pd.date_range(start='2023-01-01', periods=len(returns), freq='B')
 data = pd.DataFrame(data={'Returns': returns}, index=date_range)
-print(returns)
 
+# Проверка стационарности временного ряда с помощью теста Дики-Фуллера
 adf_test = adfuller(data['Returns'])
 
+# Вывод статистических результатов теста
 print('ADF Statistic: %f' % adf_test[0])
 print('p-value: %f' % adf_test[1])
 print('Critical Values:')
 for key, value in adf_test[4].items():
     print('\t%s: %.3f' % (key, value))
 
-# Интерпретация результатов
+# Проверка результатов на стационарность
 if adf_test[1] < 0.05:
     print("Ряд стационарен.")
 else:
     print("Ряд нестационарен.")
+
+# Удаление NaN значений из данных
 data.dropna(inplace=True)
+
+# Определение модели GARCH и её параметров
 p = 1
 q = 1
 model = arch_model(data['Returns'], vol='Garch', p=p, q=q, mean='constant', dist='normal')
 results = model.fit()
+
+# Вывод результатов модели
 print(results.summary())
+
+# Прогнозирование волатильности на следующие 5 дней
 forecast = results.forecast(horizon=5)
+
+# Расчет исторической волатильности
 historical_volatilities = np.sqrt(results.conditional_volatility)
 print(historical_volatilities)
+
+# Вывод прогнозируемой волатильности
 print("Forecasted volatilities for the next week:")
 for i in range(5):
     print(f"Day {i+1}: {forecast.variance.iloc[-1][i]}")
+
+# Расчет исторической волатильности на основе стандартного отклонения
+std_dev_volatility = data['Returns'].std()
+print("Standard Deviation based Historical Volatility:", std_dev_volatility)
+
+# Подготовка данных для построения графика
+historical_vol = np.sqrt(results.conditional_volatility)
+forecasted_vol = np.sqrt(forecast.variance.iloc[-1]*100)
+historical_dates = data.index[len(data) - len(historical_vol):]
+forecast_dates = pd.date_range(start=historical_dates[-1], periods=6, freq='B')[1:]
+
+# Создание графика
+plt.figure(figsize=(12, 6))
+plt.plot(historical_dates, historical_vol, label='Historical Volatility', color='blue')
+plt.plot(forecast_dates, forecasted_vol, label='Forecasted Volatility', color='red', linestyle='--')
+plt.legend()
+plt.title('Historical and Forecasted Volatility')
+plt.xlabel('Date')
+plt.ylabel('Volatility')
+
+# Отображение графика
+plt.show()
